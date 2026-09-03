@@ -1,9 +1,9 @@
 // Initializes and manages all models and their relationships.
 
-const sequelize = require('../config/database');
-const User = require('./user.model');
-const Store = require('./store.model');
-const Rating = require('./rating.model');
+const { sequelize } = require('../config/database');
+const User = require('./user');
+const Store = require('./store');
+const Rating = require('./rating');
 
 Store.belongsTo(User, {
     as: 'owner', 

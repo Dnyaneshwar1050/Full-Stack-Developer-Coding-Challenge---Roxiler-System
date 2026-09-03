@@ -1,7 +1,7 @@
 // Store information model
 
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { sequelize } = require('../config/database');
 
 const Store = sequelize.define('Store', {
     name: {

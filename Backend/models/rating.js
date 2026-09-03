@@ -1,7 +1,7 @@
 // Store rating model
 
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { sequelize } = require('../config/database');
 
 const Rating = sequelize.define('Rating', {
     rating: {
