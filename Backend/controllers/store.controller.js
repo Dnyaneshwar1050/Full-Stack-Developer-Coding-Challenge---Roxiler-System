@@ -34,8 +34,8 @@ exports.listStoresPublic = async (req, res) => {
           id: s.id,
           name: s.name,
           address: s.address,
-          overallRating: avg,
-          userRating,
+          averageRating: avg ? parseFloat(avg).toFixed(2) : 0,
+          userRating: userRating ? parseInt(userRating) : null,
         };
       }),
     );
@@ -89,9 +89,14 @@ exports.ownerDashboard = async (req, res) => {
     });
     const avg = avgRow ? parseFloat(avgRow.avgRating || 0) : null;
     return res.json({
-      store: { id: store.id, name: store.name, address: store.address },
       averageRating: avg,
-      ratings,
+      raters: ratings.map(r => ({
+        id: r.User.id,
+        userName: r.User.name,
+        userEmail: r.User.email,
+        rating: r.rating,
+        submittedAt: r.createdAt
+      }))
     });
   } catch (err) {
     console.error(err);

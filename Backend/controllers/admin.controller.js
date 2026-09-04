@@ -124,7 +124,7 @@ exports.listStores = async (req, res) => {
           name: s.name,
           email: s.email,
           address: s.address,
-          rating: avg ? parseFloat(avg.avgRating || 0).toFixed(2) : null,
+          averageRating: avg ? parseFloat(avg.avgRating || 0).toFixed(2) : 0,
         };
       }),
     );

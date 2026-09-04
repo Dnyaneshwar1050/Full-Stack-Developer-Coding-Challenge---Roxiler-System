@@ -3,10 +3,12 @@ const validators = require("../utils/validators");
 
 exports.submitOrUpdate = async (req, res) => {
   try {
-    const { id: storeId } = req.params;
+    const storeId = req.params.storeId || req.body.storeId;
     const { rating } = req.body;
     const errs = validators.validateRatingValue(rating);
     if (errs.length) return res.status(400).json({ errors: errs });
+
+    if (!storeId) return res.status(400).json({ message: "Store ID is required" });
 
     const store = await Store.findByPk(storeId);
     if (!store) return res.status(404).json({ message: "Store not found" });
