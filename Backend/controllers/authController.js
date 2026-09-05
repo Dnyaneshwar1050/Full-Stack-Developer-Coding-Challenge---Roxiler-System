@@ -18,6 +18,11 @@ exports.login = async (req, res, next) => {
   }
 };
 
+exports.logout = (req, res) => {
+  res.clearCookie('token');
+  return res.status(200).json({ message: 'Logged out successfully.' })
+};
+
 exports.updatePassword = async (req, res, next) => {
   try {
     const result = await authService.updatePassword(req.user.id, req.body.newPassword);

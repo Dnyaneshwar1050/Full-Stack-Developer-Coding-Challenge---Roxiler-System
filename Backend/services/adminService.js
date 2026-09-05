@@ -78,12 +78,27 @@ const createUser = async ({ name, email, password, address, role = 'normal' }) =
 };
 
 // 5. Create store
-const createStore = async ({ name, email, address, ownerId }) => {
+const createStore = async ({ name, email, address, ownerId, password }) => {
+  let assignedOwnerId = ownerId || null;
+  if (!assignedOwnerId && password) {
+    let ownerUser = await User.findOne({ where: { email } });
+    if (!ownerUser) {
+      ownerUser = await User.create({
+        name,
+        email,
+        password,
+        address,
+        role: 'store_owner',
+      });
+    }
+    assignedOwnerId = ownerUser.id;
+  }
+
   const store = await Store.create({
     name,
     email,
     address,
-    ownerId: ownerId || null,
+    ownerId: assignedOwnerId,
   });
   return store;
 };
@@ -125,6 +140,30 @@ const getUserDetails = async (userId) => {
   return response;
 };
 
+// 7. Delete user
+const deleteUser = async (userId) => {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    const err = new Error('User not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await user.destroy();
+  return { message: 'User deleted successfully' };
+};
+
+// 8. Delete store
+const deleteStore = async (storeId) => {
+  const store = await Store.findByPk(storeId);
+  if (!store) {
+    const err = new Error('Store not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await store.destroy();
+  return { message: 'Store deleted successfully' };
+};
+
 module.exports = {
   getDashboardStats,
   listUsers,
@@ -132,4 +171,6 @@ module.exports = {
   createUser,
   createStore,
   getUserDetails,
+  deleteUser,
+  deleteStore,
 };

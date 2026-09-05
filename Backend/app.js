@@ -17,7 +17,10 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 
 // Global middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json());
 
 // Health check

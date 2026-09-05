@@ -3,6 +3,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const storeController = require('../controllers/storeController');
 
+const { verifyToken } = require('../middleware/authMiddleware');
+
 // Optional authentication middleware to attach user if token present
 const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -17,7 +19,12 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
+router.get('/', optionalAuth, storeController.listStores);
 router.get('/list', optionalAuth, storeController.listStores);
+router.post('/:storeId/ratings', verifyToken, storeController.submitOrUpdateRating);
+router.post('/:storeId/rating', verifyToken, storeController.submitOrUpdateRating);
+router.put('/:storeId/ratings', verifyToken, storeController.submitOrUpdateRating);
+router.put('/:storeId/rating', verifyToken, storeController.submitOrUpdateRating);
 router.get('/:id', storeController.getStoreDetails);
 
 module.exports = router;

@@ -22,10 +22,11 @@ exports.getStoreDetails = async (req, res, next) => {
 exports.submitOrUpdateRating = async (req, res, next) => {
   try {
     const storeId = req.params.storeId || req.body.storeId;
+    const ratingValue = req.body.rating !== undefined ? req.body.rating : req.body.value;
     const result = await storeService.submitOrUpdateRating(
       req.user.id,
       storeId,
-      req.body.rating
+      Number(ratingValue)
     );
     return res.json(result);
   } catch (err) {

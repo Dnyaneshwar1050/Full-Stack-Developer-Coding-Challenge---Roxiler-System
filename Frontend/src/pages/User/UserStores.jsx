@@ -1,390 +1,229 @@
-import { useState, useEffect } from "react";
-import axiosInstance from "../../services/api";
+import React, { useState, useEffect } from 'react';
+import { storesAPI } from '../../api/endpoints';
+import { Loading } from '../../components/Loading';
+import { Alert } from '../../components/Alert';
+import { StarRating } from '../../components/StarRating';
+import { Store, Search, MapPin, CheckCircle2 } from 'lucide-react';
 
-export function UserStores() {
+export const UserStores = () => {
   const [stores, setStores] = useState([]);
-  const [filteredStores, setFilteredStores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [searchName, setSearchName] = useState("");
-  const [searchAddress, setSearchAddress] = useState("");
-  const [ratings, setRatings] = useState({});
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [submittingId, setSubmittingId] = useState(null);
-  const [ratingInputs, setRatingInputs] = useState({});
-  const [sortConfig, setSortConfig] = useState({
-    key: "name",
-    direction: "asc",
-  });
+  const [successToast, setSuccessToast] = useState('');
 
-  useEffect(() => {
-    fetchStores();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [stores, searchName, searchAddress, sortConfig]);
+  // Local state for user's pending star ratings per store { [storeId]: rating }
+  const [pendingRatings, setPendingRatings] = useState({});
 
   const fetchStores = async () => {
     try {
       setLoading(true);
-      const response = await axiosInstance.get("/store/list");
-      setStores(response.data);
+      const res = await storesAPI.getStores();
+      const list = Array.isArray(res.data) ? res.data : [];
+      setStores(list);
 
+      // Initialize pending ratings from existing userRatings
       const initialRatings = {};
-      const initialInputs = {};
-      response.data.forEach((store) => {
-        initialRatings[store.id] = store.userRating || null;
-        initialInputs[store.id] = store.userRating || "";
+      list.forEach((s) => {
+        if (s.userRating) {
+          initialRatings[s.id] = s.userRating;
+        }
       });
-      setRatings(initialRatings);
-      setRatingInputs(initialInputs);
-      setError("");
+      setPendingRatings(initialRatings);
     } catch (err) {
-      setError("Failed to load stores");
-      console.error(err);
+      setError(err.response?.data?.message || 'Failed to load stores');
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
-    let filtered = stores.filter((store) => {
-      const matchName = store.name
-        .toLowerCase()
-        .includes(searchName.toLowerCase());
-      const matchAddress = store.address
-        .toLowerCase()
-        .includes(searchAddress.toLowerCase());
-      return matchName && matchAddress;
-    });
+  useEffect(() => {
+    fetchStores();
+  }, []);
 
-    filtered.sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
-      if (typeof aVal === "string") {
-        aVal = aVal.toLowerCase();
-        bVal = bVal.toLowerCase();
-      }
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    setFilteredStores(filtered);
-  };
-
-  const handleSort = (key) => {
-    setSortConfig({
-      key,
-      direction:
-        sortConfig.key === key && sortConfig.direction === "asc"
-          ? "desc"
-          : "asc",
-    });
+  const handleRateSelect = (storeId, rating) => {
+    setPendingRatings((prev) => ({
+      ...prev,
+      [storeId]: rating,
+    }));
   };
 
   const handleRatingSubmit = async (storeId) => {
-    const rating = ratingInputs[storeId];
-
-    if (!rating) {
-      alert("Please select a rating");
-      return;
-    }
-
-    if (rating < 1 || rating > 5) {
-      alert("Rating must be between 1 and 5");
+    const ratingValue = pendingRatings[storeId];
+    if (!ratingValue) {
+      alert('Please select a rating between 1 and 5 stars');
       return;
     }
 
     setSubmittingId(storeId);
+    setError('');
     try {
-      const method = ratings[storeId] ? "put" : "post";
-      const endpoint = ratings[storeId]
-        ? `/rating/${storeId}/update`
-        : "/rating/submit";
+      const res = await storesAPI.submitRating(storeId, ratingValue);
+      const updatedRating = res.data.rating;
+      const updatedAvg = res.data.average;
 
-      await axiosInstance[method](endpoint, {
-        storeId,
-        rating: parseInt(rating),
-      });
-
-      setRatings({ ...ratings, [storeId]: rating });
-      alert(
-        ratings[storeId]
-          ? "Rating updated successfully"
-          : "Rating submitted successfully",
+      // Update state in place
+      setStores((prev) =>
+        prev.map((s) => {
+          if (s.id === storeId) {
+            return {
+              ...s,
+              userRating: updatedRating,
+              averageRating: updatedAvg !== undefined ? updatedAvg : s.averageRating,
+            };
+          }
+          return s;
+        })
       );
+
+      setSuccessToast('Rating saved successfully!');
+      setTimeout(() => setSuccessToast(''), 3000);
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to submit rating");
+      setError(err.response?.data?.message || 'Failed to submit rating');
     } finally {
       setSubmittingId(null);
     }
   };
 
-  if (loading) {
+  const filteredStores = stores.filter((s) => {
+    const term = searchTerm.toLowerCase();
     return (
-      <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
+      (s.name && s.name.toLowerCase().includes(term)) ||
+      (s.address && s.address.toLowerCase().includes(term))
     );
-  }
-
-  const containerStyle = {
-    padding: "30px",
-    maxWidth: "1200px",
-    margin: "0 auto",
-  };
-
-  const titleStyle = {
-    fontSize: "28px",
-    fontWeight: "bold",
-    marginBottom: "30px",
-    color: "#2c3e50",
-  };
-
-  const errorStyle = {
-    backgroundColor: "#fadbd8",
-    color: "#c0392b",
-    padding: "15px",
-    borderRadius: "4px",
-    marginBottom: "20px",
-  };
-
-  const filterContainerStyle = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: "15px",
-    marginBottom: "25px",
-    backgroundColor: "#f8f9fa",
-    padding: "20px",
-    borderRadius: "8px",
-  };
-
-  const filterGroupStyle = {
-    display: "flex",
-    flexDirection: "column",
-  };
-
-  const labelStyle = {
-    fontSize: "14px",
-    fontWeight: "500",
-    marginBottom: "5px",
-    color: "#34495e",
-  };
-
-  const inputStyle = {
-    padding: "8px",
-    border: "1px solid #bdc3c7",
-    borderRadius: "4px",
-    fontSize: "14px",
-  };
-
-  const storesGridStyle = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
-    gap: "20px",
-  };
-
-  const storeCardStyle = {
-    backgroundColor: "white",
-    padding: "20px",
-    borderRadius: "8px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-    border: "1px solid #ecf0f1",
-  };
-
-  const storeNameStyle = {
-    fontSize: "18px",
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: "10px",
-  };
-
-  const storeInfoStyle = {
-    fontSize: "13px",
-    color: "#7f8c8d",
-    marginBottom: "8px",
-    lineHeight: "1.6",
-  };
-
-  const ratingContainerStyle = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: "15px",
-    paddingTop: "15px",
-    borderTop: "1px solid #ecf0f1",
-  };
-
-  const ratingDisplayStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  };
-
-  const ratingBadgeStyle = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    backgroundColor: "#fff3cd",
-    color: "#856404",
-    fontWeight: "bold",
-    fontSize: "16px",
-  };
-
-  const ratingFormStyle = {
-    display: "flex",
-    gap: "10px",
-    alignItems: "center",
-  };
-
-  const selectStyle = {
-    padding: "6px 8px",
-    border: "1px solid #bdc3c7",
-    borderRadius: "4px",
-    fontSize: "13px",
-  };
-
-  const buttonStyle = {
-    padding: "6px 12px",
-    backgroundColor: "#27ae60",
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    fontSize: "13px",
-    fontWeight: "bold",
-    cursor: "pointer",
-  };
-
-  const noResultsStyle = {
-    padding: "40px",
-    textAlign: "center",
-    color: "#7f8c8d",
-  };
+  });
 
   return (
-    <div style={containerStyle}>
-      <h1 style={titleStyle}>Available Stores</h1>
-
-      {error && <div style={errorStyle}>{error}</div>}
-
-      <div style={filterContainerStyle}>
-        <div style={filterGroupStyle}>
-          <label style={labelStyle}>Search by Store Name</label>
-          <input
-            type="text"
-            style={inputStyle}
-            value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
-            placeholder="Filter by store name..."
-          />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-gray-200 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Browse & Rate Stores</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Discover community stores, check average ratings, and submit your reviews.
+          </p>
         </div>
 
-        <div style={filterGroupStyle}>
-          <label style={labelStyle}>Search by Address</label>
+        <div className="relative w-full sm:w-72">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
           <input
             type="text"
-            style={inputStyle}
-            value={searchAddress}
-            onChange={(e) => setSearchAddress(e.target.value)}
-            placeholder="Filter by address..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search store name, address..."
+            className="w-full pl-10 pr-3.5 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
       </div>
 
-      {filteredStores.length === 0 ? (
-        <div style={noResultsStyle}>No stores found</div>
-      ) : (
-        <div style={storesGridStyle}>
-          {filteredStores.map((store) => (
-            <div
-              key={store.id}
-              style={storeCardStyle}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.boxShadow =
-                  "0 4px 20px rgba(0,0,0,0.15)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.1)")
-              }
-            >
-              <div style={storeNameStyle}>{store.name}</div>
-              <div style={storeInfoStyle}>
-                <strong>Email:</strong> {store.email}
-              </div>
-              <div style={storeInfoStyle}>
-                <strong>Address:</strong> {store.address}
-              </div>
-
-              <div style={ratingContainerStyle}>
-                <div style={ratingDisplayStyle}>
-                  <span style={{ fontSize: "13px", fontWeight: "500" }}>
-                    Avg Rating:
-                  </span>
-                  <div style={ratingBadgeStyle}>
-                    {typeof store.averageRating === "number"
-                      ? store.averageRating.toFixed(1)
-                      : "N/A"}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  marginTop: "15px",
-                  paddingTop: "15px",
-                  borderTop: "1px solid #ecf0f1",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: "500",
-                    marginBottom: "8px",
-                  }}
-                >
-                  {ratings[store.id]
-                    ? `Your Rating: ${ratings[store.id]}/5`
-                    : "No rating yet"}
-                </div>
-                <div style={ratingFormStyle}>
-                  <select
-                    style={selectStyle}
-                    value={ratingInputs[store.id] || ""}
-                    onChange={(e) =>
-                      setRatingInputs({
-                        ...ratingInputs,
-                        [store.id]: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Select rating...</option>
-                    <option value="1">1 - Poor</option>
-                    <option value="2">2 - Fair</option>
-                    <option value="3">3 - Good</option>
-                    <option value="4">4 - Very Good</option>
-                    <option value="5">5 - Excellent</option>
-                  </select>
-                  <button
-                    style={buttonStyle}
-                    onClick={() => handleRatingSubmit(store.id)}
-                    disabled={submittingId === store.id}
-                    onMouseEnter={(e) =>
-                      (e.target.style.backgroundColor = "#229954")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.target.style.backgroundColor = "#27ae60")
-                    }
-                  >
-                    {submittingId === store.id ? "Submitting..." : "Submit"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+      <Alert message={error} onClose={() => setError('')} />
+      {successToast && (
+        <div className="mt-4 flex items-center space-x-2 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-medium">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>{successToast}</span>
         </div>
       )}
+
+      {/* Store Cards Grid */}
+      <div className="mt-6">
+        {loading ? (
+          <Loading text="Loading community stores..." />
+        ) : filteredStores.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-xl border border-gray-200 shadow-xs">
+            <Store className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-600 text-base font-medium">No stores match your search</p>
+            <p className="text-gray-400 text-xs mt-1">Try typing a different name or location</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredStores.map((store) => {
+              const currentPending = pendingRatings[store.id] || 0;
+              const hasRatedBefore = Boolean(store.userRating);
+              const isChanged = currentPending !== (store.userRating || 0);
+
+              return (
+                <div
+                  key={store.id}
+                  className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col justify-between hover:border-gray-300 transition-all"
+                >
+                  <div>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-bold text-gray-900 leading-tight">
+                          {store.name}
+                        </h3>
+                        <div className="flex items-center text-xs text-gray-500 mt-1.5 space-x-1">
+                          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="line-clamp-2">{store.address}</span>
+                        </div>
+                      </div>
+                      <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                        <Store className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    {/* Overall Average Rating */}
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Overall Rating
+                      </span>
+                      <StarRating
+                        value={store.averageRating}
+                        readOnly
+                        size="sm"
+                        showLabel={true}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Rating Box */}
+                  <div className="mt-5 pt-4 border-t border-gray-100 bg-gray-50/70 -mx-5 -mb-5 p-4 rounded-b-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-700">
+                        {hasRatedBefore ? 'Your Rating' : 'Rate this store'}
+                      </span>
+                      {hasRatedBefore && (
+                        <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded">
+                          Rated {store.userRating}★
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <StarRating
+                        value={currentPending}
+                        onChange={(val) => handleRateSelect(store.id, val)}
+                        size="md"
+                        showLabel={false}
+                      />
+
+                      <button
+                        onClick={() => handleRatingSubmit(store.id)}
+                        disabled={submittingId === store.id || (!isChanged && hasRatedBefore)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors shadow-xs ${
+                          isChanged || !hasRatedBefore
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {submittingId === store.id
+                          ? 'Saving...'
+                          : hasRatedBefore
+                          ? isChanged
+                            ? 'Update'
+                            : 'Saved'
+                          : 'Submit'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+};

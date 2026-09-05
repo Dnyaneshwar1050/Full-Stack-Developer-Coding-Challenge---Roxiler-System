@@ -53,3 +53,21 @@ exports.getUserDetails = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const result = await adminService.deleteUser(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteStore = async (req, res, next) => {
+  try {
+    const result = await adminService.deleteStore(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
