@@ -29,7 +29,7 @@ export const OwnerDashboard = () => {
   if (loading) return <Loading text="Loading store dashboard..." />;
 
   const store = dashboardData?.store || {};
-  const raters = dashboardData?.raters || [];
+  const raters = dashboardData?.raters || []; 1
   const averageRating = dashboardData?.averageRating || 0;
 
   return (
@@ -140,10 +140,10 @@ export const OwnerDashboard = () => {
                           <td className="px-5 py-3.5 text-gray-500 text-xs">
                             {r.submittedAt
                               ? new Date(r.submittedAt).toLocaleDateString(undefined, {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                })
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
                               : '-'}
                           </td>
                         </tr>
